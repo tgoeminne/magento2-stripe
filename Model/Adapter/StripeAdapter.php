@@ -14,7 +14,7 @@ class StripeAdapter
 {
     const MODULE_NAME = 'Aune_Stripe';
     const APPLICATION_NAME = 'AuneStripeM2';
-    const APPLICATION_URL = 'https://gitbub.com/aune/magento2-stripe';
+    const APPLICATION_URL = 'https://github.com/aune-io/magento2-stripe';
     const API_VERSION = '2017-08-15';
     
     /**
