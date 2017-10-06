@@ -10,16 +10,16 @@ use Magento\Vault\Model\Ui\VaultConfigProvider;
 use Aune\Stripe\Gateway\Config\Config;
 use Aune\Stripe\Gateway\Helper\AmountProvider;
 use Aune\Stripe\Gateway\Helper\SubjectReader;
-use Aune\Stripe\Gateway\Request\PaymentDataBuilder;
+use Aune\Stripe\Gateway\Request\RefundDataBuilder;
 use Aune\Stripe\Observer\DataAssignObserver;
 
-class PaymentDataBuilderTest extends \PHPUnit\Framework\TestCase
+class RefundDataBuilderTest extends \PHPUnit\Framework\TestCase
 {
     const CURRENCY_CODE_DECIMAL = 'USD';
     const CURRENCY_CODE_ZERO_DECIMAL = 'JPY';
-
+    
     /**
-     * @var PaymentDataBuilder
+     * @var RefundDataBuilder
      */
     private $builder;
 
@@ -51,9 +51,6 @@ class PaymentDataBuilderTest extends \PHPUnit\Framework\TestCase
     protected function setUp()
     {
         $this->paymentDO = $this->getMockForAbstractClass(PaymentDataObjectInterface::class);
-        $this->configMock = $this->getMockBuilder(Config::class)
-            ->disableOriginalConstructor()
-            ->getMock();
         $this->paymentMock = $this->getMockBuilder(Payment::class)
             ->disableOriginalConstructor()
             ->getMock();
@@ -62,14 +59,15 @@ class PaymentDataBuilderTest extends \PHPUnit\Framework\TestCase
             ->getMock();
         $this->orderMock = $this->getMockForAbstractClass(OrderAdapterInterface::class);
 
-        $this->builder = new PaymentDataBuilder(
-            $this->configMock,
+        $this->builder = new RefundDataBuilder(
             new AmountProvider(),
             $this->subjectReaderMock
         );
     }
 
     /**
+     * @covers \Aune\Stripe\Gateway\Request\RefundDataBuilder::build
+     * 
      * @expectedException \InvalidArgumentException
      */
     public function testBuildReadPaymentException()
@@ -85,10 +83,16 @@ class PaymentDataBuilderTest extends \PHPUnit\Framework\TestCase
     }
 
     /**
-     * @expectedException \InvalidArgumentException
+     * @covers \Aune\Stripe\Gateway\Request\RefundDataBuilder::build
      */
     public function testBuildReadAmountException()
     {
+        $chargeId = rand();
+        $expectedResult = [
+            RefundDataBuilder::CHARGE  => $chargeId,
+            RefundDataBuilder::AMOUNT  => null,
+        ];
+        
         $buildSubject = [
             'payment' => $this->paymentDO,
             'amount' => null
@@ -108,19 +112,33 @@ class PaymentDataBuilderTest extends \PHPUnit\Framework\TestCase
             ->method('getOrder')
             ->willReturn($this->orderMock);
 
+        $this->paymentDO->expects(static::once())
+            ->method('getPayment')
+            ->willReturn($this->paymentMock);
+
+        $this->paymentMock->expects(static::once())
+            ->method('getLastTransId')
+            ->willReturn($chargeId);
+
         $this->orderMock->expects(static::once())
             ->method('getCurrencyCode')
             ->willReturn(self::CURRENCY_CODE_DECIMAL);
 
-        $this->builder->build($buildSubject);
+        static::assertEquals(
+            $expectedResult,
+            $this->builder->build($buildSubject)
+        );
     }
 
+    /**
+     * @covers \Aune\Stripe\Gateway\Request\RefundDataBuilder::build
+     */
     public function testBuildDecimal()
     {
+        $chargeId = rand();
         $expectedResult = [
-            PaymentDataBuilder::AMOUNT  => 1000,
-            PaymentDataBuilder::CURRENCY  => self::CURRENCY_CODE_DECIMAL,
-            PaymentDataBuilder::CAPTURE => false,
+            RefundDataBuilder::CHARGE  => $chargeId,
+            RefundDataBuilder::AMOUNT  => 1000,
         ];
 
         $buildSubject = [
@@ -145,6 +163,10 @@ class PaymentDataBuilderTest extends \PHPUnit\Framework\TestCase
         $this->paymentDO->expects(static::once())
             ->method('getOrder')
             ->willReturn($this->orderMock);
+        
+        $this->paymentMock->expects(static::once())
+            ->method('getLastTransId')
+            ->willReturn($chargeId);
 
         $this->orderMock->expects(static::once())
             ->method('getCurrencyCode')
@@ -156,12 +178,16 @@ class PaymentDataBuilderTest extends \PHPUnit\Framework\TestCase
         );
     }
 
+    /**
+     * @covers \Aune\Stripe\Gateway\Request\RefundDataBuilder::build
+     */
     public function testBuildZeroDecimal()
     {
+        $chargeId = rand();
+        
         $expectedResult = [
-            PaymentDataBuilder::AMOUNT  => 1000,
-            PaymentDataBuilder::CURRENCY  => self::CURRENCY_CODE_ZERO_DECIMAL,
-            PaymentDataBuilder::CAPTURE => false,
+            RefundDataBuilder::CHARGE  => $chargeId,
+            RefundDataBuilder::AMOUNT  => 1000,
         ];
 
         $buildSubject = [
@@ -186,6 +212,10 @@ class PaymentDataBuilderTest extends \PHPUnit\Framework\TestCase
         $this->paymentDO->expects(static::once())
             ->method('getOrder')
             ->willReturn($this->orderMock);
+        
+        $this->paymentMock->expects(static::once())
+            ->method('getLastTransId')
+            ->willReturn($chargeId);
 
         $this->orderMock->expects(static::once())
             ->method('getCurrencyCode')
